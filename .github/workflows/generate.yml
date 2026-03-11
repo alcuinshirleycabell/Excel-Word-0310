@@ -1,0 +1,82 @@
+name: Excel to Word Batch Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_url:
+        description: 'Word模板文件URL（可选，支持飞书/腾讯文档等直链）'
+        required: false
+        default: ''
+      excel_url:
+        description: 'Excel数据文件URL（可选）'
+        required: false
+        default: ''
+      filename_column:
+        description: '用于文件命名的列名（可选，如：客户姓名）'
+        required: false
+        default: ''
+      filename_pattern:
+        description: '文件名模板（可选，如：诊断报告_{客户姓名}）'
+        required: false
+        default: ''
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install python-docx pandas openpyxl
+
+    - name: Prepare input files
+      run: |
+        mkdir -p input output
+
+        # 下载或复制模板
+        if [ -n "${{ github.event.inputs.template_url }}" ]; then
+          echo "从URL下载模板..."
+          curl -L -o input/template.docx "${{ github.event.inputs.template_url }}"
+        elif [ -f "template.docx" ]; then
+          echo "使用仓库中的template.docx"
+          cp template.docx input/template.docx
+        else
+          echo "❌ 错误：未找到模板文件"
+          exit 1
+        fi
+
+        # 下载或复制Excel
+        if [ -n "${{ github.event.inputs.excel_url }}" ]; then
+          echo "从URL下载Excel..."
+          curl -L -o input/data.xlsx "${{ github.event.inputs.excel_url }}"
+        elif [ -f "data.xlsx" ]; then
+          echo "使用仓库中的data.xlsx"
+          cp data.xlsx input/data.xlsx
+        else
+          echo "❌ 错误：未找到Excel文件"
+          exit 1
+        fi
+
+    - name: Generate documents
+      run: |
+        python batch_word_gen.py --cli \
+          --template input/template.docx \
+          --excel input/data.xlsx \
+          --output output \
+          --filename-col "${{ github.event.inputs.filename_column }}" \
+          --filename-pattern "${{ github.event.inputs.filename_pattern }}"
+
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      with:
+        name: generated-documents
+        path: output/*.docx
+        retention-days: 7

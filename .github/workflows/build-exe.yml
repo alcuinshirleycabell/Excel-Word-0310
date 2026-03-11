@@ -1,0 +1,57 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（可选，如：v1.0.0）'
+        required: false
+        default: ''
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'batch_word_gen.py'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-docx pandas openpyxl
+          pip install pyinstaller
+
+      - name: List files
+        run: dir
+
+      - name: Build EXE
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --clean --name "ExcelToWord生成器" batch_word_gen.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExcelToWord-生成器
+          path: dist/*.exe
+          retention-days: 30
+
+      - name: Create Release
+        if: github.event.inputs.version != ''
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          files: dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
