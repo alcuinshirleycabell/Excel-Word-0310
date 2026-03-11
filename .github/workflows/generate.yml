@@ -1,0 +1,61 @@
+name: Excel to Word Batch Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      filename_column:
+        description: '用于文件命名的列名（可选，如：客户姓名）'
+        required: false
+        default: ''
+      filename_pattern:
+        description: '文件名模板（可选，如：诊断报告_{客户姓名}）'
+        required: false
+        default: ''
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Check input files
+      run: |
+        echo "检查输入文件..."
+        if [ ! -f "template.docx" ]; then
+          echo "❌ 错误：未找到 template.docx"
+          echo "请将Word模板重命名为 template.docx 并放入仓库根目录"
+          exit 1
+        fi
+        if [ ! -f "data.xlsx" ]; then
+          echo "❌ 错误：未找到 data.xlsx"  
+          echo "请将Excel数据重命名为 data.xlsx 并放入仓库根目录"
+          exit 1
+        fi
+        echo "✅ 文件检查通过"
+
+    - name: Generate Word documents
+      run: |
+        python batch_word_gen.py --cli \
+          --template template.docx \
+          --excel data.xlsx \
+          --output output \
+          --filename-col "${{ github.event.inputs.filename_column }}" \
+          --filename-pattern "${{ github.event.inputs.filename_pattern }}"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: generated-documents
+        path: output/*.docx
+        retention-days: 7
